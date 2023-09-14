@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+from typing import Optional
 from sqlalchemy import create_engine, Column, Integer, String
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
@@ -17,7 +18,12 @@ class UserBase(BaseModel):
     phone: str
 
 class UserCreate(UserBase):
+    full_name: str
+    email: str
+    phone: str
     password: str
+    profile_picture: Optional[str] = None
+    
 
 class User(UserBase):
     id: int
@@ -36,30 +42,40 @@ class DBUser(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    full_name = Column(String, index=True)
-    email = Column(String, unique=True, index=True)
-    password = Column(String)
-    phone = Column(String)
+    full_name = Column(String(255), index=True)
+    email = Column(String(255), unique=True, index=True)
+    password = Column(String(255))  # Specify a maximum length for the password column
+    phone = Column(String(20)) 
+    profile_picture = Column(String)
+
+# Create the 'users' table in the database
+Base.metadata.create_all(bind=engine)
+
+
+
+
+
+
+
 
 # MongoDB setup
 client = MongoClient("mongodb+srv://sangeetha18geethu:0JBeOW8roqu7In4J@cluster0.vqmvmgv.mongodb.net/?retryWrites=true&w=majority")
 
-db = client["fastapi_db"]
+db = client["pro_pic"]
 
 @app.get("/")
 def read_root():
     return {"message": "Welcome to your FastAPI application!"}
 
 @app.post("/register", response_model=User)
-def register(user: UserCreate):
-    db_postgresql = SessionLocal()
+def create_user(user: UserCreate):
+    db_mysql = SessionLocal()
     db_mongodb = db["user_profiles"]
-    
-    db_user = DBUser(**user.dict())
-    db_postgresql.add(db_user)
-    db_postgresql.commit()
-    db_postgresql.refresh(db_user)
-    db_postgresql.close()
+    db_user = DBUser(**user.dict())  # Create a new DBUser instance
+    db_mysql.add(db_user)
+    db_mysql.commit()
+    db_mysql.refresh(db_user)
+    db_mysql.close()
 
     # Save profile picture to MongoDB
     profile_picture = {"user_id": db_user.id, "profile_picture": user.profile_picture}
@@ -69,9 +85,9 @@ def register(user: UserCreate):
 
 @app.get("/users/{user_id}", response_model=UserProfile)
 def get_user(user_id: int):
-    db_postgresql = SessionLocal()
+    db_mysql = SessionLocal()
     db_user = db_postgresql.query(DBUser).filter(DBUser.id == user_id).first()
-    db_postgresql.close()
+    db_mysql.close()
 
     if db_user is None:
         raise HTTPException(status_code=404, detail="User not found")
